@@ -320,7 +320,7 @@ INPUT → High-Pass → Low-Shelf → Peaking → Pitch Shift → OUTPUT
 3. **Peaking third**: Make precise mid/high adjustments
 4. **Pitch Shift last**: Avoid artifacts from filter processing
 
-## 📊 **Memory Flow & Data Structures**
+##  **Memory Flow & Data Structures**
 
 ```mermaid
 graph LR
@@ -800,9 +800,6 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ---
 
-**Enjoy professional audio processing from the command line!** 🎧
+**Enjoy professional audio processing from the command line!** 
 
-[![Star on GitHub](https://img.shields.io/github/stars/yourusername/audio-tool?style=social)](https://github.com/yourusername/audio-tool)
-[![Follow](https://img.shields.io/twitter/follow/yourusername?style=social)](https://twitter.com/yourusername)
-
-*For questions and support, please open an issue on GitHub.*
+For questions and support, please open an issue on GitHub. This project is for educational and demonstration purposes.
