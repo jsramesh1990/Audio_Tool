@@ -1,4 +1,4 @@
-// main.cpp
+
 // Single-file small audio processor: reads WAV, applies pitch shift via resampling and biquad filters
 
 #include <sndfile.h>
