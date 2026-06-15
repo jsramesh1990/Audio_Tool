@@ -752,24 +752,6 @@ make
 valgrind --leak-check=full ./audio_tool -i input.wav -o output.wav
 ```
 
-##  License
-
-![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-##  Contributing
-
-![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen?style=for-the-badge)
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
 ##  Resources
 
 ### Learning Resources
