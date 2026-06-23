@@ -1,0 +1,2 @@
+# Using Yocto SDK toolchain
+aarch64-poky-linux-dtc -@ -I dts -O dtb -o imx8mp-verdin-audio-overlay.dtbo imx8mp-verdin-audio-overlay.dts

@@ -1,0 +1,866 @@
+The **Yocto BSP build** for a Verdin iMX8M Plus is essentially a large automation pipeline. You don't build the kernel, U-Boot, and rootfs separately by hand. Instead, **BitBake** builds everything according to recipes and dependencies.
+
+For a board from [Toradex](https://www.toradex.com?utm_source=chatgpt.com), the flow looks like this:
+
+```text
+                Yocto BSP
+
+      +----------------------+
+      |  meta-toradex        |
+      |  meta-freescale      |
+      |  meta-openembedded   |
+      |  poky                |
+      +----------------------+
+
+                 |
+
+             BitBake
+
+                 |
+
+    +------------+-------------+
+    |            |             |
+  U-Boot      Linux        RootFS
+    |            |             |
+  SPL         DTB          BusyBox
+  ATF         Modules      Systemd
+                           Qt
+                           Docker
+
+    +------------+-------------+
+
+                 |
+
+           Final Image
+
+       .wic / TEZI Image
+
+                 |
+
+         Flash to eMMC
+```
+
+---
+
+# 1. BSP Structure
+
+A Yocto BSP consists of multiple layers.
+
+Example:
+
+```text
+yocto/
+
+├── poky/
+
+├── meta-openembedded/
+
+├── meta-freescale/
+
+├── meta-toradex-bsp-common/
+
+├── meta-toradex-nxp/
+
+└── build/
+```
+
+---
+
+# What is Poky?
+
+`poky` is the base Yocto distribution.
+
+Contains:
+
+```text
+BitBake
+
+Build system
+
+Basic recipes
+
+Toolchains
+
+Core libraries
+
+Root filesystem generation
+```
+
+Think of it as:
+
+```text
+Poky
+
+=
+
+BitBake
+
++
+
+OpenEmbedded Core
+
++
+
+Reference Distro
+```
+
+---
+
+# meta-freescale
+
+This layer provides support for:
+
+```text
+NXP i.MX6
+
+i.MX7
+
+i.MX8M
+
+i.MX8M Plus
+
+i.MX93
+```
+
+Contains:
+
+```text
+Linux recipes
+
+U-Boot recipes
+
+ATF
+
+GPU drivers
+
+Firmware
+
+NXP multimedia
+```
+
+---
+
+# meta-toradex
+
+This layer contains:
+
+```text
+Board support
+
+Verdin configs
+
+Colibri configs
+
+Device trees
+
+Easy Installer images
+
+Carrier board configs
+```
+
+Example:
+
+```text
+recipes-bsp/
+
+recipes-kernel/
+
+recipes-core/
+
+recipes-graphics/
+
+recipes-security/
+```
+
+---
+
+# 2. Initialize Yocto Environment
+
+Go to Yocto directory:
+
+```bash
+cd yocto
+```
+
+Initialize:
+
+```bash
+source poky/oe-init-build-env
+```
+
+This creates:
+
+```text
+build/
+
+├── conf/
+
+│   ├── bblayers.conf
+
+│   └── local.conf
+
+│
+
+├── downloads/
+
+├── sstate-cache/
+
+└── tmp/
+```
+
+---
+
+# 3. bblayers.conf
+
+This file tells BitBake:
+
+**Which layers are available?**
+
+Example:
+
+```bash
+BBLAYERS ?=
+
+poky/meta
+
+poky/meta-poky
+
+meta-openembedded/meta-oe
+
+meta-openembedded/meta-python
+
+meta-freescale
+
+meta-toradex-bsp-common
+
+meta-toradex-nxp
+```
+
+---
+
+# 4. local.conf
+
+This file tells BitBake:
+
+**Which board and distro to build?**
+
+Example:
+
+```bash
+MACHINE = "verdin-imx8mp"
+
+DISTRO = "tdx-xwayland"
+```
+
+You can also select:
+
+```bash
+DISTRO = "poky"
+
+DISTRO = "tdx-wayland"
+
+DISTRO = "tdx-xwayland"
+```
+
+---
+
+# 5. Machine Configuration
+
+When you write:
+
+```bash
+MACHINE = "verdin-imx8mp"
+```
+
+Yocto loads:
+
+```text
+meta-toradex-nxp
+
+↓
+
+conf/machine/
+
+↓
+
+verdin-imx8mp.conf
+```
+
+Inside:
+
+```text
+Kernel Provider
+
+U-Boot Provider
+
+ATF Provider
+
+DTB names
+
+Image types
+
+GPU drivers
+
+Firmware
+```
+
+This file defines:
+
+```text
+How to build
+
+Which sources
+
+Which patches
+
+Which configs
+```
+
+---
+
+# 6. BitBake Build Flow
+
+Suppose you run:
+
+```bash
+bitbake tdx-reference-multimedia-image
+```
+
+BitBake first parses recipes.
+
+```text
+recipes
+
+↓
+
+dependencies
+
+↓
+
+task graph
+
+↓
+
+execute tasks
+```
+
+Internally:
+
+```text
+do_fetch
+
+↓
+
+do_unpack
+
+↓
+
+do_patch
+
+↓
+
+do_configure
+
+↓
+
+do_compile
+
+↓
+
+do_install
+
+↓
+
+do_package
+
+↓
+
+do_rootfs
+
+↓
+
+do_image
+```
+
+---
+
+# 7. Example: Kernel Build
+
+Recipe:
+
+```text
+recipes-kernel/
+
+linux/
+
+linux-toradex.bb
+```
+
+BitBake executes:
+
+### do_fetch
+
+```text
+Download kernel source
+
+git clone
+```
+
+---
+
+### do_unpack
+
+```text
+Extract source
+
+tmp/work/
+
+linux/
+```
+
+---
+
+### do_patch
+
+Apply:
+
+```text
+Toradex patches
+
+NXP patches
+
+Custom patches
+```
+
+---
+
+### do_configure
+
+Runs:
+
+```bash
+make verdin_defconfig
+```
+
+Generates:
+
+```text
+.config
+```
+
+---
+
+### do_compile
+
+Runs:
+
+```bash
+make -j16
+```
+
+Builds:
+
+```text
+Image
+
+modules
+
+dtb
+```
+
+---
+
+### do_install
+
+Copies:
+
+```text
+Image
+
+*.dtb
+
+modules
+```
+
+to:
+
+```text
+tmp/work/
+
+image/
+```
+
+---
+
+# 8. U-Boot Build
+
+Recipe:
+
+```text
+recipes-bsp/
+
+u-boot/
+
+u-boot-toradex.bb
+```
+
+Tasks:
+
+```text
+Fetch
+
+↓
+
+Patch
+
+↓
+
+Configure
+
+↓
+
+Compile
+
+↓
+
+Install
+```
+
+Builds:
+
+```text
+SPL
+
+u-boot.bin
+
+flash.bin
+```
+
+---
+
+# 9. ATF Build
+
+ATF means:
+
+```text
+ARM Trusted Firmware
+```
+
+It runs:
+
+```text
+ROM
+
+↓
+
+SPL
+
+↓
+
+ATF
+
+↓
+
+U-Boot
+
+↓
+
+Linux
+```
+
+Build:
+
+```text
+bl31.bin
+```
+
+This handles:
+
+```text
+Secure monitor
+
+EL3
+
+PSCI
+
+CPU power management
+```
+
+---
+
+# 10. Root Filesystem Build
+
+Recipe:
+
+```text
+tdx-reference-multimedia-image.bb
+```
+
+Contains:
+
+```text
+BusyBox
+
+Systemd
+
+Qt
+
+Wayland
+
+Docker
+
+Gstreamer
+
+Python
+
+OpenSSL
+
+NetworkManager
+```
+
+BitBake collects:
+
+```text
+all packages
+
+↓
+
+dependency tree
+
+↓
+
+rootfs
+
+↓
+
+compress
+
+↓
+
+create image
+```
+
+Generates:
+
+```text
+rootfs.ext4
+
+rootfs.tar.gz
+
+image.wic
+```
+
+---
+
+# 11. Device Tree Build
+
+Source:
+
+```text
+arch/arm64/boot/dts/
+
+freescale/
+
+imx8mp-verdin.dts
+```
+
+BitBake runs:
+
+```bash
+dtc
+
+-I dts
+
+-O dtb
+```
+
+Output:
+
+```text
+imx8mp-verdin.dtb
+```
+
+---
+
+# 12. Final Image Generation
+
+BitBake combines:
+
+```text
+SPL
+
++
+
+ATF
+
++
+
+U-Boot
+
++
+
+Kernel
+
++
+
+DTB
+
++
+
+RootFS
+```
+
+Creates:
+
+```text
+tmp/deploy/images/
+
+verdin-imx8mp/
+
+├── flash.bin
+
+├── Image
+
+├── imx8mp-verdin.dtb
+
+├── modules.tgz
+
+├── rootfs.tar.gz
+
+├── image.wic
+
+└── TEZI image
+```
+
+---
+
+# 13. TEZI Image
+
+TEZI means:
+
+```text
+Toradex Easy Installer
+```
+
+It creates:
+
+```text
+tezi/
+
+├── image.json
+
+├── bootfs.tar.gz
+
+├── rootfs.tar.gz
+
+├── flash.bin
+
+└── Image
+```
+
+You copy:
+
+```text
+TEZI Folder
+
+↓
+
+USB Stick
+
+↓
+
+Insert into board
+
+↓
+
+Easy Installer
+
+↓
+
+Flash eMMC
+```
+
+---
+
+# 14. Complete Yocto BSP Flow
+
+This is the exact sequence:
+
+```text
+source oe-init-build-env
+
+        ↓
+
+Read local.conf
+
+        ↓
+
+Read bblayers.conf
+
+        ↓
+
+Load MACHINE
+
+        ↓
+
+Parse Recipes
+
+        ↓
+
+Create Dependency Graph
+
+        ↓
+
+Fetch Sources
+
+        ↓
+
+Apply Patches
+
+        ↓
+
+Configure
+
+        ↓
+
+Build U-Boot
+
+        ↓
+
+Build ATF
+
+        ↓
+
+Build Linux
+
+        ↓
+
+Build DTB
+
+        ↓
+
+Build RootFS
+
+        ↓
+
+Package Files
+
+        ↓
+
+Generate WIC
+
+        ↓
+
+Generate TEZI
+
+        ↓
+
+Flash eMMC
+
+        ↓
+
+Boot Board
+```
+
+This is the standard workflow used in commercial projects based on Verdin iMX8M Plus. Once you understand this flow, the next step is usually learning **how to create your own Yocto layer (`meta-mycompany`)**, add custom recipes, and integrate your application into the BSP image.
+

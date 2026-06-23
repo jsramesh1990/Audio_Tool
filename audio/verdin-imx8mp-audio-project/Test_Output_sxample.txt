@@ -1,0 +1,25 @@
+╔════════════════════════════════════════╗
+║   Audio Test Suite                    ║
+║   Verdin iMX8MP Audio Project        ║
+╚════════════════════════════════════════╝
+
+╔════════════════════════════════════════╗
+║   Checking Audio Hardware             ║
+╚════════════════════════════════════════╝
+Available sound cards:
+ 0 [imx8mpnaug      ]: imx8mp-naug - imx8mp-naug
+                      imx8mp-naug
+
+✅ NAU8822 codec detected
+✅ ALSA playback devices found
+
+╔════════════════════════════════════════╗
+║   Testing Audio Playback              ║
+╚════════════════════════════════════════╝
+ℹ️  Running speaker test (2 seconds)...
+✅ Speaker test passed
+ℹ️  Playing sine wave at 440Hz...
+✅ Sine wave playback passed
+
+✅ ALL TESTS PASSED!
+🎉 Audio system is working correctly

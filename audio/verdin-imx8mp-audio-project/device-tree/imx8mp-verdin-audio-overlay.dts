@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+/*
+ * Device Tree Overlay for Verdin iMX8MP Audio Support
+ * 
+ * This overlay adds audio support for various codecs on the Verdin iMX8MP
+ * Supports: NAU8822, WM8904, and generic I2S codecs
+ * 
+ * To compile:
+ *   dtc -@ -I dts -O dtb -o imx8mp-verdin-audio-overlay.dtbo imx8mp-verdin-audio-overlay.dts
+ * 
+ * To load:
+ *   mkdir -p /configfs/device-tree/overlays/audio
+ *   cat imx8mp-verdin-audio-overlay.dtbo > /configfs/device-tree/overlays/audio/dtbo
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/clock/imx8mp-clock.h>
+#include <dt-bindings/pinctrl/pins-imx8mp.h>
+
+/ {
+    fragment@0 {
+        target = <&i2c3>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+            clock-frequency = <400000>;
+
+            /* NAU8822 Audio Codec on I2C3 */
+            nau8822_1a: codec@1a {
+                compatible = "nuvoton,nau8822";
+                reg = <0x1a>;
+                clocks = <&clk IMX8MP_CLK_SAI1>;
+                clock-names = "mclk";
+                nuvoton,jkdet-enable;
+                nuvoton,vref-impedance = <3>;
+                nuvoton,micbias-voltage = <3>;
+                nuvoton,sysclk-src = <0>;
+                nuvoton,irq-gpio = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+                nuvoton,gpo-clk = "gpio";
+                nuvoton,micbias = "vdd";
+                
+                #sound-dai-cells = <0>;
+                status = "okay";
+            };
+        };
+    };
+
+    fragment@1 {
+        target = <&sai1>;
+        __overlay__ {
+            #sound-dai-cells = <0>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&pinctrl_sai1>;
+            assigned-clocks = <&clk IMX8MP_CLK_SAI1>;
+            assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+            assigned-clock-rates = <12288000>;
+            clocks = <&clk IMX8MP_CLK_SAI1_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+                     <&clk IMX8MP_CLK_SAI1>, <&clk IMX8MP_CLK_DUMMY>,
+                     <&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>;
+            clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k";
+            dmas = <&sdma1 0>, <&sdma1 1>;
+            dma-names = "rx", "tx";
+            status = "okay";
+        };
+    };
+
+    fragment@2 {
+        target = <&sai3>;
+        __overlay__ {
+            #sound-dai-cells = <0>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&pinctrl_sai3>;
+            assigned-clocks = <&clk IMX8MP_CLK_SAI3>;
+            assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+            assigned-clock-rates = <12288000>;
+            clocks = <&clk IMX8MP_CLK_SAI3_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+                     <&clk IMX8MP_CLK_SAI3>, <&clk IMX8MP_CLK_DUMMY>,
+                     <&clk IMX8MP_CLK_DUMMY>, <&clk IMX8MP_AUDIO_PLL1_OUT>;
+            clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k";
+            dmas = <&sdma1 3>, <&sdma1 4>;
+            dma-names = "rx", "tx";
+            status = "okay";
+        };
+    };
+
+    /* Main Sound Card */
+    fragment@3 {
+        target-path = "/";
+        __overlay__ {
+            sound {
+                compatible = "simple-audio-card";
+                simple-audio-card,name = "imx8mp-audio";
+                simple-audio-card,format = "i2s";
+                simple-audio-card,bitclock-master = <&sound_codec>;
+                simple-audio-card,frame-master = <&sound_codec>;
+                simple-audio-card,widgets =
+                    "Headphone", "Headphones",
+                    "Microphone", "Mic Jack",
+                    "Speaker", "Internal Speaker",
+                    "Line", "Line In";
+                simple-audio-card,routing =
+                    "Headphones", "HPOL",
+                    "Headphones", "HPOR",
+                    "MIC", "Mic Jack",
+                    "Mic Jack", "MICBIAS",
+                    "Internal Speaker", "SPKOUTL",
+                    "Internal Speaker", "SPKOUTR",
+                    "Line In", "LINEINL",
+                    "Line In", "LINEINR";
+                
+                simple-audio-card,dai-link@0 {
+                    format = "i2s";
+                    bitclock-master = <&sound_codec>;
+                    frame-master = <&sound_codec>;
+                    
+                    sound_cpu: cpu {
+                        sound-dai = <&sai1>;
+                    };
+                    
+                    sound_codec: codec {
+                        sound-dai = <&nau8822_1a>;
+                        clocks = <&clk IMX8MP_CLK_SAI1>;
+                    };
+                };
+            };
+        };
+    };
+
+    /* Pin Configuration */
+    fragment@4 {
+        target = <&iomuxc>;
+        __overlay__ {
+            pinctrl_sai1: sai1grp {
+                fsl,pins = <
+                    MX8MP_IOMUXC_SAI1_MCLK__SAI1_MCLK	0xd6
+                    MX8MP_IOMUXC_SAI1_RXFS__SAI1_RX_SYNC	0xd6
+                    MX8MP_IOMUXC_SAI1_RXC__SAI1_RX_BCLK	0xd6
+                    MX8MP_IOMUXC_SAI1_RXD0__SAI1_RX_DATA0	0xd6
+                    MX8MP_IOMUXC_SAI1_TXFS__SAI1_TX_SYNC	0xd6
+                    MX8MP_IOMUXC_SAI1_TXC__SAI1_TX_BCLK	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD0__SAI1_TX_DATA0	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD1__SAI1_TX_DATA1	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD2__SAI1_TX_DATA2	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD3__SAI1_TX_DATA3	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD4__SAI1_TX_DATA4	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD5__SAI1_TX_DATA5	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD6__SAI1_TX_DATA6	0xd6
+                    MX8MP_IOMUXC_SAI1_TXD7__SAI1_TX_DATA7	0xd6
+                >;
+            };
+
+            pinctrl_sai3: sai3grp {
+                fsl,pins = <
+                    MX8MP_IOMUXC_SAI3_MCLK__SAI3_MCLK	0xd6
+                    MX8MP_IOMUXC_SAI3_RXFS__SAI3_RX_SYNC	0xd6
+                    MX8MP_IOMUXC_SAI3_RXC__SAI3_RX_BCLK	0xd6
+                    MX8MP_IOMUXC_SAI3_RXD__SAI3_RX_DATA0	0xd6
+                    MX8MP_IOMUXC_SAI3_TXFS__SAI3_TX_SYNC	0xd6
+                    MX8MP_IOMUXC_SAI3_TXC__SAI3_TX_BCLK	0xd6
+                    MX8MP_IOMUXC_SAI3_TXD__SAI3_TX_DATA0	0xd6
+                >;
+            };
+        };
+    };
+};

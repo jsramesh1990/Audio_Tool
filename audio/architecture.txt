@@ -1,0 +1,940 @@
+For an **audio product** (digital mixer, synthesizer, smart speaker, guitar processor, DAW, etc.) based on the **Toradex Verdin iMX8M Plus**, the Yocto BSP is usually organized into several layers:
+
+```text
+Hardware
+   │
+   ├── Audio Codec (WM8960 / TLV320 / AKM ...)
+   ├── Mic Array
+   ├── Speaker Amplifier
+   └── I2S / SAI
+
+Linux Kernel
+   │
+   ├── ALSA SoC Driver
+   ├── Codec Driver
+   ├── DMA Driver
+   └── Device Tree
+
+User Space
+   │
+   ├── ALSA
+   ├── PulseAudio or PipeWire
+   ├── GStreamer
+   ├── DSP Engine
+   └── Qt GUI
+
+Application
+   │
+   ├── Effects
+   ├── Mixer
+   ├── AI Audio
+   └── Recording
+```
+
+---
+
+# 1. Hardware Audio Path
+
+Suppose your board contains:
+
+```text
+Mic
+
+↓
+
+Audio Codec
+
+↓
+
+SAI2 / I2S
+
+↓
+
+i.MX8M Plus
+
+↓
+
+DSP
+
+↓
+
+SAI2
+
+↓
+
+Codec
+
+↓
+
+Speaker
+```
+
+Example codec:
+
+* WM8960
+* TLV320AIC3104
+* SGTL5000
+* AK4556
+* CS4272
+
+The codec converts:
+
+```text
+Analog
+
+↓
+
+ADC
+
+↓
+
+PCM samples
+
+↓
+
+I2S
+
+↓
+
+CPU
+```
+
+and back:
+
+```text
+CPU
+
+↓
+
+I2S
+
+↓
+
+DAC
+
+↓
+
+Analog
+
+↓
+
+Speaker
+```
+
+---
+
+# 2. Kernel Audio Stack
+
+Linux uses:
+
+```text
+Application
+
+↓
+
+ALSA API
+
+↓
+
+ASoC Layer
+
+↓
+
+Machine Driver
+
+↓
+
+Codec Driver
+
+↓
+
+SAI Driver
+
+↓
+
+DMA
+
+↓
+
+Hardware
+```
+
+ASoC means:
+
+**ALSA System on Chip**
+
+---
+
+## Example
+
+For:
+
+```text
+iMX8MP
+
++
+
+WM8960 codec
+```
+
+Kernel loads:
+
+```text
+snd_soc_imx
+
+snd_soc_fsl_sai
+
+snd_soc_wm8960
+
+snd_pcm
+
+snd_timer
+```
+
+---
+
+# 3. Device Tree
+
+Audio hardware is described in DTS.
+
+Example:
+
+```dts
+&sai2 {
+
+status = "okay";
+
+};
+
+&codec {
+
+compatible = "wlf,wm8960";
+
+reg = <0x1a>;
+
+};
+
+sound {
+
+compatible = "simple-audio-card";
+
+simple-audio-card,name = "MyAudio";
+
+simple-audio-card,cpu {
+
+sound-dai = <&sai2>;
+
+};
+
+simple-audio-card,codec {
+
+sound-dai = <&codec>;
+
+};
+
+};
+```
+
+This tells Linux:
+
+```text
+SAI2
+
+connected to
+
+WM8960
+```
+
+---
+
+# 4. Yocto Audio Packages
+
+Inside Yocto:
+
+```text
+meta-mycompany
+
+|
+
+recipes-multimedia
+
+|
+
+audio
+
+|
+
+audio-image.bb
+```
+
+Example image:
+
+```bash
+IMAGE_INSTALL += "\
+alsa-utils \
+alsa-lib \
+pipewire \
+pipewire-alsa \
+gstreamer1.0 \
+gstreamer1.0-plugins-base \
+gstreamer1.0-plugins-good \
+"
+```
+
+This installs:
+
+```text
+ALSA
+
+PipeWire
+
+GStreamer
+
+Audio utilities
+```
+
+---
+
+# 5. ALSA Layer
+
+ALSA talks directly to hardware.
+
+Example:
+
+```cpp
+snd_pcm_open(
+
+&handle,
+
+"default",
+
+SND_PCM_STREAM_CAPTURE,
+
+0
+
+);
+```
+
+Read:
+
+```cpp
+snd_pcm_readi(
+
+handle,
+
+buffer,
+
+frames
+
+);
+```
+
+Write:
+
+```cpp
+snd_pcm_writei(
+
+handle,
+
+buffer,
+
+frames
+
+);
+```
+
+This gives:
+
+```text
+Mic
+
+↓
+
+PCM Samples
+
+↓
+
+Your Application
+
+↓
+
+PCM Samples
+
+↓
+
+Speaker
+```
+
+---
+
+# 6. GStreamer Pipeline
+
+Many companies use:
+
+### GStreamer
+
+because:
+
+* Easy pipelines
+* Hardware acceleration
+* Plugins
+* Recording
+* Streaming
+
+---
+
+## Mic to Speaker
+
+```bash
+gst-launch-1.0
+
+alsasrc
+
+!
+
+audioconvert
+
+!
+
+alsasink
+```
+
+Flow:
+
+```text
+Mic
+
+↓
+
+alsasrc
+
+↓
+
+audioconvert
+
+↓
+
+alsasink
+
+↓
+
+Speaker
+```
+
+---
+
+## Record WAV
+
+```bash
+gst-launch-1.0
+
+alsasrc
+
+!
+
+wavenc
+
+!
+
+filesink
+
+location=test.wav
+```
+
+Flow:
+
+```text
+Mic
+
+↓
+
+PCM
+
+↓
+
+WAV Encoder
+
+↓
+
+File
+```
+
+---
+
+# 7. DSP Processing
+
+Many audio products insert DSP.
+
+Example:
+
+```text
+Mic
+
+↓
+
+ALSA Capture
+
+↓
+
+EQ
+
+↓
+
+Compressor
+
+↓
+
+Noise Reduction
+
+↓
+
+Reverb
+
+↓
+
+Mixer
+
+↓
+
+ALSA Playback
+```
+
+---
+
+Example C++:
+
+```cpp
+for(i=0;i<n;i++)
+
+{
+
+out[i]
+
+=
+
+eq(
+
+compressor(
+
+reverb(
+
+input[i]
+
+)
+
+)
+
+);
+
+}
+```
+
+---
+
+# 8. PipeWire
+
+Modern Linux often uses:
+
+### PipeWire
+
+It manages:
+
+```text
+Applications
+
+↓
+
+PipeWire
+
+↓
+
+Audio Graph
+
+↓
+
+ALSA
+
+↓
+
+Hardware
+```
+
+PipeWire allows:
+
+```text
+Mic
+
+↓
+
+Noise Reduction
+
+↓
+
+EQ
+
+↓
+
+Compressor
+
+↓
+
+Recorder
+
+↓
+
+Speaker
+```
+
+Everything is connected as nodes.
+
+---
+
+# 9. Example PipeWire Graph
+
+```text
+Mic
+
+↓
+
+Capture Node
+
+↓
+
+EQ Node
+
+↓
+
+Noise Suppression
+
+↓
+
+Mixer Node
+
+↓
+
+Speaker
+
+↓
+
+Recorder Node
+
+↓
+
+WAV File
+```
+
+Each box:
+
+```text
+Plugin
+
+or
+
+Application
+```
+
+---
+
+# 10. AI Audio
+
+Suppose:
+
+```text
+Mic
+
+↓
+
+AI Noise Reduction
+
+↓
+
+Wake Word Detection
+
+↓
+
+DSP
+
+↓
+
+Speaker
+```
+
+AI model:
+
+```text
+TensorFlow Lite
+
+↓
+
+NPU
+
+↓
+
+Noise Suppression
+
+↓
+
+Enhanced PCM
+```
+
+Pipeline:
+
+```text
+Mic
+
+↓
+
+ALSA
+
+↓
+
+TFLite
+
+↓
+
+NPU
+
+↓
+
+DSP
+
+↓
+
+ALSA
+
+↓
+
+Speaker
+```
+
+---
+
+# 11. Professional Mixer Architecture
+
+A digital mixer may look like:
+
+```text
+Mic1
+
+Mic2
+
+Mic3
+
+Mic4
+
+↓
+
+↓
+
+↓
+
+↓
+
+ALSA Capture
+
+↓
+
+DSP Engine
+
+↓
+
+EQ
+
+↓
+
+Compressor
+
+↓
+
+Limiter
+
+↓
+
+Reverb
+
+↓
+
+Mixer
+
+↓
+
+Master
+
+↓
+
+ALSA Playback
+
+↓
+
+Codec
+
+↓
+
+Speaker
+```
+
+GUI:
+
+```text
+Qt
+
+↓
+
+Mixer UI
+
+↓
+
+Faders
+
+↓
+
+Presets
+
+↓
+
+DSP Parameters
+```
+
+---
+
+# 12. Yocto Recipe for Audio App
+
+Example:
+
+```text
+meta-mycompany/
+
+recipes-app/
+
+myaudio/
+
+myaudio.bb
+```
+
+Recipe:
+
+```bitbake
+DESCRIPTION = "Audio Engine"
+
+SRC_URI = "git://gitserver/myaudio"
+
+inherit cmake
+
+DEPENDS += "
+
+alsa-lib
+
+pipewire
+
+gstreamer1.0
+
+"
+
+```
+
+---
+
+BitBake:
+
+```text
+Fetch
+
+↓
+
+Configure
+
+↓
+
+Compile
+
+↓
+
+Install
+
+↓
+
+Package
+
+↓
+
+Add to Image
+```
+
+---
+
+# 13. Complete Audio BSP Flow
+
+A commercial audio product on Verdin iMX8MP usually follows:
+
+```text
+Yocto BSP
+
+↓
+
+Kernel
+
+↓
+
+ASoC Drivers
+
+↓
+
+Codec Driver
+
+↓
+
+Device Tree
+
+↓
+
+ALSA
+
+↓
+
+PipeWire
+
+↓
+
+GStreamer
+
+↓
+
+DSP Engine
+
+↓
+
+AI Models
+
+↓
+
+Qt GUI
+
+↓
+
+Application
+
+↓
+
+Final Image
+
+↓
+
+TEZI
+
+↓
+
+Flash eMMC
+
+↓
+
+Boot
+
+↓
+
+Audio Product Ready
+```
+
+This is the architecture used in many **smart speakers**, **digital mixers**, **musical instruments**, and **AI audio edge devices** built on the i.MX8M Plus.
+
+The interesting part—and where most of the engineering effort goes—is **how the DSP engine is integrated into ALSA/PipeWire/GStreamer**, because there are several architectures (standalone DSP thread, GStreamer plugin, PipeWire node, or running DSP on the Cortex-M7).
+

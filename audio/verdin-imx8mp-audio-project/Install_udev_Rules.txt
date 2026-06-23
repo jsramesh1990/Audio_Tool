@@ -1,0 +1,9 @@
+# Copy rules file
+sudo cp configs/audio_rules.rules /etc/udev/rules.d/99-audio.rules
+
+# Reload udev
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Restart ALSA
+sudo /etc/init.d/alsa-utils restart

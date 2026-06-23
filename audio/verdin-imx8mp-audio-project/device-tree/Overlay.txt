@@ -1,0 +1,125 @@
+Method 1: ConfigFS (Runtime)
+bash
+
+# Create overlay directory
+mkdir -p /configfs/device-tree/overlays/audio
+
+# Load overlay
+cat imx8mp-verdin-audio-overlay.dtbo > /configfs/device-tree/overlays/audio/dtbo
+
+# Verify
+cat /proc/device-tree/sound/compatible
+
+Method 2: U-Boot (Persistent)
+bash
+
+# In U-Boot
+setenv fdt_overlays imx8mp-verdin-audio-overlay.dtbo
+saveenv
+boot
+
+Method 3: Custom Kernel Build
+
+Place the .dtbo file in /lib/firmware/ and add to kernel command line:
+bash
+
+# In /boot/extlinux/extlinux.conf
+FDT /imx8mp-verdin.dtb
+FDTOVERLAYS /imx8mp-verdin-audio-overlay.dtbo
+
+Unloading the Overlay
+bash
+
+# Remove from ConfigFS
+echo 0 > /configfs/device-tree/overlays/audio/status
+rmdir /configfs/device-tree/overlays/audio
+
+Verification
+Check if overlay is loaded
+bash
+
+# List all overlays
+ls /configfs/device-tree/overlays/
+
+# Check device tree
+cat /proc/device-tree/sound/compatible
+cat /proc/device-tree/sound/simple-audio-card,name
+
+# Check audio devices
+aplay -l
+arecord -l
+cat /proc/asound/cards
+
+Check ALSA configuration
+bash
+
+# List sound cards
+cat /proc/asound/cards
+
+# Check codec
+dmesg | grep -i "nau8822"
+dmesg | grep -i "wm8904"
+
+# Test audio
+speaker-test -c 2 -t sine -f 440
+
+Troubleshooting
+Overlay not loading
+bash
+
+# Check kernel config
+zcat /proc/config.gz | grep CONFIG_OF_OVERLAY
+
+# Check for errors
+dmesg | grep -i "overlay"
+dmesg | grep -i "of: overlay"
+
+No sound card detected
+bash
+
+# Check I2C devices
+i2cdetect -y 3  # Check for codec at 0x1a or 0x1b
+
+# Check pinmux
+cat /sys/kernel/debug/pinctrl/pinctrl-handles
+
+# Check audio clocks
+cat /sys/kernel/debug/clk/clk_summary | grep sai
+
+Audio not working
+bash
+
+# Check ALSA configuration
+alsamixer
+
+# Check audio routing
+amixer -c0 contents
+
+# Test with direct ALSA
+aplay -D hw:0,0 test.wav
+
+Customization
+Changing Sample Rate
+dts
+
+# In the overlay
+assigned-clock-rates = <12288000>;  # 48kHz
+# or
+assigned-clock-rates = <11289600>;  # 44.1kHz
+
+Adding Multiple Codecs
+dts
+
+&i2c3 {
+    codec@1a {
+        compatible = "nuvoton,nau8822";
+        reg = <0x1a>;
+        #sound-dai-cells = <0>;
+    };
+    
+    codec@1b {
+        compatible = "wlf,wm8904";
+        reg = <0x1b>;
+        #sound-dai-cells = <0>;
+    };
+};

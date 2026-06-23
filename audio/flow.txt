@@ -1,0 +1,849 @@
+For the **Toradex Verdin iMX8M Plus**, the build flow is very similar to other embedded Linux boards, but Toradex provides a complete BSP and OS called **Torizon OS** or **Yocto BSP**.
+
+Here is the **complete build flow from scratch**, which most embedded Linux engineers follow.
+
+---
+
+# Overall Build Flow
+
+```text
+Host PC (Ubuntu 22.04)
+
+    │
+
+    ├── Install Build Tools
+
+    │
+
+    ├── Download Source Code
+
+    │      ├── U-Boot
+    │      ├── Linux Kernel
+    │      ├── Device Tree
+    │      └── RootFS / Yocto BSP
+
+    │
+
+    ├── Build Bootloader
+
+    │      └── flash.bin
+
+    │
+
+    ├── Build Linux Kernel
+
+    │      ├── Image
+    │      ├── *.dtb
+    │      └── Modules
+
+    │
+
+    ├── Build Root Filesystem
+
+    │      ├── Busybox
+    │      ├── Systemd
+    │      ├── Qt
+    │      └── Applications
+
+    │
+
+    ├── Create SD/eMMC Image
+
+    │
+
+    └── Flash to Board
+
+            │
+
+            Boot
+
+            ROM
+
+             ↓
+
+            SPL
+
+             ↓
+
+           U-Boot
+
+             ↓
+
+        Linux Kernel
+
+             ↓
+
+        Device Tree
+
+             ↓
+
+          RootFS
+
+             ↓
+
+        User Application
+```
+
+---
+
+# STEP 1 : Prepare Build Machine
+
+Use:
+
+```text
+Ubuntu 22.04 LTS
+
+RAM : 16 GB minimum
+
+Storage : 150 GB free
+
+CPU : 8 cores recommended
+```
+
+Install packages:
+
+```bash
+sudo apt update
+
+sudo apt install -y \
+git \
+build-essential \
+gcc \
+g++ \
+cmake \
+wget \
+curl \
+python3 \
+python3-pip \
+gawk \
+diffstat \
+unzip \
+texinfo \
+chrpath \
+socat \
+libsdl1.2-dev \
+xterm \
+zstd \
+lz4 \
+u-boot-tools \
+device-tree-compiler
+```
+
+---
+
+# STEP 2 : Install Cross Compiler
+
+Because:
+
+```text
+Host PC
+
+x86_64
+
+↓
+
+Target Board
+
+ARM64
+```
+
+You need:
+
+```bash
+sudo apt install gcc-aarch64-linux-gnu
+```
+
+Verify:
+
+```bash
+aarch64-linux-gnu-gcc --version
+```
+
+Example:
+
+```text
+aarch64-linux-gnu-gcc
+
+gcc 12.x
+```
+
+---
+
+# STEP 3 : Get Source Code
+
+Normally source consists of:
+
+```text
+Source Tree
+
+bootloader/
+
+kernel/
+
+device-tree/
+
+rootfs/
+
+applications/
+```
+
+---
+
+## Bootloader Source
+
+Clone:
+
+```bash
+git clone \
+https://github.com/u-boot/u-boot.git
+
+cd u-boot
+```
+
+---
+
+## Kernel Source
+
+Clone:
+
+```bash
+git clone \
+https://github.com/torvalds/linux.git
+
+cd linux
+```
+
+---
+
+## Or Use Toradex BSP
+
+Toradex maintains:
+
+```text
+meta-toradex
+
+meta-freescale
+
+poky
+
+meta-openembedded
+```
+
+which are Yocto layers.
+
+---
+
+# STEP 4 : Build U-Boot
+
+Move:
+
+```bash
+cd u-boot
+```
+
+Set environment:
+
+```bash
+export ARCH=arm64
+
+export CROSS_COMPILE=aarch64-linux-gnu-
+```
+
+Configure:
+
+```bash
+make imx8mp_evk_defconfig
+```
+
+Build:
+
+```bash
+make -j8
+```
+
+Generated:
+
+```text
+u-boot.bin
+
+SPL
+
+flash.bin
+```
+
+---
+
+# STEP 5 : Build Linux Kernel
+
+Move:
+
+```bash
+cd linux
+```
+
+Set:
+
+```bash
+export ARCH=arm64
+
+export CROSS_COMPILE=aarch64-linux-gnu-
+```
+
+Configure:
+
+```bash
+make defconfig
+```
+
+or
+
+```bash
+make menuconfig
+```
+
+Enable:
+
+```text
+Audio
+
+ALSA
+
+SAI
+
+I2S
+
+USB
+
+Ethernet
+
+PCIe
+
+HDMI
+
+DRM
+
+GPU
+
+Camera
+```
+
+Build:
+
+```bash
+make -j8
+```
+
+Output:
+
+```text
+arch/arm64/boot/Image
+
+*.dtb
+
+modules
+```
+
+---
+
+# STEP 6 : Device Tree Build
+
+Device Tree describes:
+
+```text
+GPIO
+
+Audio Codec
+
+Display
+
+Ethernet PHY
+
+USB
+
+I2C Devices
+
+SPI Devices
+```
+
+Example:
+
+```dts
+&i2c2 {
+
+codec: wm8960@1a {
+
+compatible = "wlf,wm8960";
+
+reg = <0x1a>;
+
+};
+
+};
+```
+
+Compile:
+
+```bash
+dtc
+
+-I dts
+
+-O dtb
+
+myboard.dts
+
+-o myboard.dtb
+```
+
+Generated:
+
+```text
+myboard.dtb
+```
+
+---
+
+# STEP 7 : Build Root Filesystem
+
+Two methods:
+
+---
+
+## Method 1
+
+BusyBox
+
+Simple:
+
+```text
+/
+
+bin
+
+sbin
+
+etc
+
+usr
+
+lib
+
+proc
+
+sys
+
+dev
+```
+
+Clone:
+
+```bash
+git clone git://busybox.net/busybox.git
+
+cd busybox
+
+make defconfig
+
+make
+
+make install
+```
+
+---
+
+## Method 2
+
+Yocto
+
+Industrial standard.
+
+Contains:
+
+```text
+Kernel
+
+Bootloader
+
+Qt
+
+Docker
+
+Systemd
+
+Applications
+
+Security
+
+OTA
+```
+
+---
+
+# STEP 8 : Yocto Environment Setup
+
+Clone:
+
+```bash
+mkdir yocto
+
+cd yocto
+```
+
+Get:
+
+```text
+poky
+
+meta-openembedded
+
+meta-freescale
+
+meta-toradex
+```
+
+Initialize:
+
+```bash
+source poky/oe-init-build-env
+```
+
+This creates:
+
+```text
+build/
+
+conf/
+
+tmp/
+
+downloads/
+
+sstate-cache/
+```
+
+---
+
+## Configure Board
+
+Edit:
+
+```text
+conf/local.conf
+```
+
+Set:
+
+```bash
+MACHINE = "verdin-imx8mp"
+```
+
+Example:
+
+```bash
+DISTRO = "tdx-xwayland"
+
+MACHINE = "verdin-imx8mp"
+```
+
+---
+
+# STEP 9 : Full Yocto Build
+
+Build image:
+
+```bash
+bitbake tdx-reference-multimedia-image
+```
+
+This builds:
+
+```text
+U-Boot
+
+↓
+
+ATF
+
+↓
+
+Kernel
+
+↓
+
+DTB
+
+↓
+
+Modules
+
+↓
+
+RootFS
+
+↓
+
+Qt
+
+↓
+
+Gstreamer
+
+↓
+
+Docker
+
+↓
+
+Image
+```
+
+Generated:
+
+```text
+deploy/images/verdin-imx8mp/
+
+flash.bin
+
+Image
+
+*.dtb
+
+rootfs.tar
+
+.wic image
+
+tezi image
+```
+
+---
+
+# STEP 10 : Flash Image
+
+Toradex provides:
+
+```text
+Toradex Easy Installer
+```
+
+Copy image:
+
+```text
+TEZI folder
+
+↓
+
+USB Stick
+
+↓
+
+Boot board
+
+↓
+
+Install
+
+↓
+
+eMMC
+```
+
+or
+
+Flash manually:
+
+```bash
+dd if=image.wic
+
+of=/dev/sdX
+
+bs=4M
+```
+
+---
+
+# STEP 11 : Boot Sequence
+
+Actual boot process:
+
+```text
+Power ON
+
+↓
+
+Boot ROM
+
+↓
+
+SPL
+
+↓
+
+DDR Initialization
+
+↓
+
+ATF
+
+(ARM Trusted Firmware)
+
+↓
+
+U-Boot
+
+↓
+
+Load Kernel
+
+↓
+
+Load DTB
+
+↓
+
+Load RootFS
+
+↓
+
+Linux Init
+
+↓
+
+Systemd
+
+↓
+
+Qt GUI
+
+↓
+
+Application
+```
+
+---
+
+# STEP 12 : Application Build
+
+Example:
+
+```text
+my_project/
+
+├── ui/
+
+│
+
+├── audio/
+
+│
+
+├── dsp/
+
+│
+
+├── ai/
+
+│
+
+├── drivers/
+
+│
+
+├── scripts/
+
+│
+
+└── CMakeLists.txt
+```
+
+Build:
+
+```bash
+mkdir build
+
+cd build
+
+cmake ..
+
+make -j8
+```
+
+Generate:
+
+```text
+myapp
+```
+
+Copy:
+
+```bash
+scp myapp
+
+root@board:/usr/bin
+```
+
+Run:
+
+```bash
+./myapp
+```
+
+---
+
+# Real Industry Flow (Toradex / NXP Projects)
+
+Most companies follow exactly this pipeline:
+
+```text
+Ubuntu Host
+
+↓
+
+Yocto BSP
+
+↓
+
+Build U-Boot
+
+↓
+
+Build ATF
+
+↓
+
+Build Linux Kernel
+
+↓
+
+Build DTB
+
+↓
+
+Build RootFS
+
+↓
+
+Build Qt Apps
+
+↓
+
+Build AI Models
+
+↓
+
+Create TEZI Image
+
+↓
+
+Flash eMMC
+
+↓
+
+Boot Board
+
+↓
+
+Run Application
+```
+
+This is the standard production flow used for **Toradex Verdin iMX8M Plus**, **NXP EVK boards**, industrial HMIs, audio workstations, smart speakers, and AI edge devices.
+

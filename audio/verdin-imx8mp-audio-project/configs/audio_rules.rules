@@ -1,0 +1,142 @@
+# udev rules for audio devices on Verdin iMX8MP
+# Place this file in /etc/udev/rules.d/99-audio.rules
+
+# ============================================
+# Audio Device Permissions
+# ============================================
+
+# Set permissions for all audio devices
+SUBSYSTEM=="sound", KERNEL=="controlC*", GROUP="audio", MODE="0660"
+SUBSYSTEM=="sound", KERNEL=="pcmC*", GROUP="audio", MODE="0660"
+SUBSYSTEM=="sound", KERNEL=="timer", GROUP="audio", MODE="0660"
+SUBSYSTEM=="sound", KERNEL=="seq", GROUP="audio", MODE="0660"
+
+# ============================================
+# Specific Audio Hardware
+# ============================================
+
+# NAU8822 Audio Codec
+SUBSYSTEM=="sound", ATTRS{id}=="nau8822", GROUP="audio", MODE="0660"
+
+# WM8904 Audio Codec
+SUBSYSTEM=="sound", ATTRS{id}=="wm8904", GROUP="audio", MODE="0660"
+
+# SAI1 Interface
+SUBSYSTEM=="sound", KERNEL=="sai1*", GROUP="audio", MODE="0660"
+
+# ============================================
+# DSP Configuration
+# ============================================
+
+# Set DSP governor to performance for low latency
+SUBSYSTEM=="sound", ATTR{power/control}="on"
+
+# Set audio device buffer sizes
+SUBSYSTEM=="sound", KERNEL=="pcmC*D*", ATTR{param}="period_size=1024,period_count=4"
+
+# ============================================
+# User Permissions
+# ============================================
+
+# Add users to audio group
+SUBSYSTEM=="sound", KERNEL=="controlC*", RUN+="/usr/bin/usermod -a -G audio %u"
+
+# ============================================
+# Audio Quality Settings
+# ============================================
+
+# Disable suspend for audio devices
+SUBSYSTEM=="sound", KERNEL=="*", ATTR{power/control}="on"
+
+# Set nice level for audio processes
+SUBSYSTEM=="sound", KERNEL=="*", RUN+="/usr/bin/renice -n -20 -p %p"
+
+# ============================================
+# Device Naming
+# ============================================
+
+# Create symbolic links for easy access
+SUBSYSTEM=="sound", KERNEL=="controlC0", SYMLINK+="audio/control"
+SUBSYSTEM=="sound", KERNEL=="pcmC0D0p", SYMLINK+="audio/playback"
+SUBSYSTEM=="sound", KERNEL=="pcmC0D0c", SYMLINK+="audio/capture"
+SUBSYSTEM=="sound", KERNEL=="pcmC0D1p", SYMLINK+="audio/playback_hdmi"
+
+# ============================================
+# Audio Hotplug
+# ============================================
+
+# Reload ALSA when audio device is plugged
+ACTION=="add", SUBSYSTEM=="sound", KERNEL=="controlC*", RUN+="/sbin/alsactl restore"
+
+# Notify when audio device is removed
+ACTION=="remove", SUBSYSTEM=="sound", KERNEL=="controlC*", RUN+="/usr/bin/logger 'Audio device removed'"
+
+# ============================================
+# PulseAudio/ALSA Integration
+# ============================================
+
+# If PulseAudio is used, set up proper permissions
+SUBSYSTEM=="sound", KERNEL=="*", GROUP="pulse", MODE="0660"
+SUBSYSTEM=="sound", KERNEL=="*", TAG+="systemd", ENV{SYSTEMD_WANTS}="pulseaudio.service"
+
+# ============================================
+# DSP and Audio Processing
+# ============================================
+
+# Enable audio processing (if available)
+SUBSYSTEM=="sound", KERNEL=="*", ATTR{dsp_processing}="1"
+
+# Set audio sample rate
+SUBSYSTEM=="sound", KERNEL=="*", ATTR{sample_rate}="48000"
+
+# ============================================
+# Debugging
+# ============================================
+
+# Log audio events for debugging
+SUBSYSTEM=="sound", KERNEL=="*", ACTION=="add", RUN+="/usr/bin/logger 'Audio device added: %k'"
+SUBSYSTEM=="sound", KERNEL=="*", ACTION=="remove", RUN+="/usr/bin/logger 'Audio device removed: %k'"
+SUBSYSTEM=="sound", KERNEL=="*", ACTION=="change", RUN+="/usr/bin/logger 'Audio device changed: %k'"
+
+# ============================================
+# Custom Audio Settings for Verdin iMX8MP
+# ============================================
+
+# Set up Verdin specific audio routing
+SUBSYSTEM=="sound", KERNEL=="controlC0", RUN+="/usr/bin/amixer -c0 sset 'Headphone' 70%"
+SUBSYSTEM=="sound", KERNEL=="controlC0", RUN+="/usr/bin/amixer -c0 sset 'Speaker' 70%"
+SUBSYSTEM=="sound", KERNEL=="controlC0", RUN+="/usr/bin/amixer -c0 sset 'Mic' 80%"
+SUBSYSTEM=="sound", KERNEL=="controlC0", RUN+="/usr/bin/amixer -c0 sset 'Playback Path' 'HP'"
+SUBSYSTEM=="sound", KERNEL=="controlC0", RUN+="/usr/bin/amixer -c0 sset 'Capture Path' 'Main Mic'"
+
+# ============================================
+# Performance Tuning
+# ============================================
+
+# Increase audio buffer sizes for better performance
+SUBSYSTEM=="sound", KERNEL=="*", ATTR{prealloc}="4096"
+
+# Set realtime priority for audio threads
+SUBSYSTEM=="sound", KERNEL=="*", RUN+="/usr/bin/chrt -f -p 50 %p"
+
+# Disable audio power saving
+SUBSYSTEM=="sound", KERNEL=="*", ATTR{power_saving}="0"
+
+# ============================================
+# Device Tree Overlay for Audio
+# ============================================
+
+# Load audio device tree overlay if available
+SUBSYSTEM=="sound", KERNEL=="controlC0", RUN+="/usr/sbin/device-tree-overlay load audio-overlay.dtbo"
+
+# ============================================
+# User Configuration
+# ============================================
+
+# Create audio configuration directory
+RUN+="/usr/bin/mkdir -p /etc/audio"
+RUN+="/usr/bin/chmod 755 /etc/audio"
+
+# ============================================
+# End of rules
+# ============================================

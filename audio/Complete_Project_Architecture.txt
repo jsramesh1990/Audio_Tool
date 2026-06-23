@@ -1,0 +1,838 @@
+If your goal is to build an **Audio/AI product on Toradex Verdin iMX8M Plus using Yocto BSP**, then I would recommend following the same flow used in industry projects.
+
+---
+
+# Phase 1: Hardware Bring-Up
+
+### Step 1: Get the Hardware
+
+You need:
+
+* Verdin iMX8M Plus SoM
+* Verdin Development Board / Carrier Board
+* Audio Codec board (WM8960 / TLV320 / SGTL5000 etc.)
+* Microphone
+* Speaker / Headphone
+* Ethernet or WiFi
+* SD Card
+
+Goal:
+
+✅ Boot Linux
+✅ Verify audio hardware
+
+---
+
+# Phase 2: Host Machine Setup
+
+## Step 2: Install Ubuntu
+
+Recommended:
+
+```text
+Ubuntu 22.04 LTS
+
+RAM : 16 GB+
+
+CPU : 8 Core+
+
+Disk : 200 GB+
+```
+
+---
+
+## Step 3: Install Build Packages
+
+```bash
+sudo apt update
+
+sudo apt install -y \
+gawk \
+wget \
+git \
+diffstat \
+unzip \
+texinfo \
+gcc \
+build-essential \
+chrpath \
+socat \
+cpio \
+python3 \
+python3-pip \
+python3-pexpect \
+xz-utils \
+debianutils \
+iputils-ping \
+libsdl1.2-dev \
+xterm \
+zstd \
+lz4 \
+libssl-dev \
+u-boot-tools \
+device-tree-compiler
+```
+
+---
+
+# Phase 3: Get Yocto BSP
+
+## Step 4: Download Toradex BSP
+
+Create workspace:
+
+```bash
+mkdir ~/toradex
+
+cd ~/toradex
+```
+
+Get repo tool:
+
+```bash
+mkdir ~/bin
+
+PATH=~/bin:$PATH
+
+curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+
+chmod +x ~/bin/repo
+```
+
+---
+
+## Step 5: Initialize BSP
+
+Example:
+
+```bash
+repo init \
+-u https://git.toradex.com/toradex-manifest.git \
+-b kirkstone-6.x.y
+```
+
+Sync:
+
+```bash
+repo sync -j8
+```
+
+You will get:
+
+```text
+toradex/
+
+├── poky
+
+├── meta-openembedded
+
+├── meta-freescale
+
+├── meta-toradex-bsp-common
+
+├── meta-toradex-nxp
+
+└── layers
+```
+
+---
+
+# Phase 4: Setup Build Environment
+
+## Step 6
+
+Initialize:
+
+```bash
+source export
+```
+
+or
+
+```bash
+source poky/oe-init-build-env
+```
+
+Creates:
+
+```text
+build/
+
+├── conf
+
+├── tmp
+
+├── downloads
+
+└── sstate-cache
+```
+
+---
+
+# Phase 5: Configure Board
+
+## Step 7
+
+Edit:
+
+```bash
+build/conf/local.conf
+```
+
+Set:
+
+```bash
+MACHINE = "verdin-imx8mp"
+
+DISTRO = "tdx-xwayland"
+```
+
+This selects:
+
+```text
+Verdin iMX8M Plus
+
+Wayland
+
+Qt
+
+GPU
+
+Multimedia
+```
+
+---
+
+# Phase 6: Configure Audio Hardware
+
+Suppose:
+
+```text
+iMX8MP
+
+↓
+
+SAI2
+
+↓
+
+WM8960
+
+↓
+
+Mic + Speaker
+```
+
+Edit Device Tree.
+
+Example:
+
+```dts
+&sai2 {
+
+status = "okay";
+
+};
+
+&codec {
+
+compatible = "wlf,wm8960";
+
+reg = <0x1a>;
+
+};
+
+sound {
+
+compatible = "simple-audio-card";
+
+simple-audio-card,name = "MyAudio";
+
+simple-audio-card,cpu {
+
+sound-dai = <&sai2>;
+
+};
+
+simple-audio-card,codec {
+
+sound-dai = <&codec>;
+
+};
+
+};
+```
+
+Goal:
+
+```bash
+aplay -l
+```
+
+Should show:
+
+```text
+card 0: MyAudio
+```
+
+---
+
+# Phase 7: Configure Kernel
+
+## Step 8
+
+Enable:
+
+```text
+ALSA
+
+ASoC
+
+SAI
+
+DMA
+
+WM8960
+
+USB Audio
+
+S/PDIF
+
+I2S
+```
+
+Using:
+
+```bash
+bitbake virtual/kernel -c menuconfig
+```
+
+Save:
+
+```text
+defconfig
+```
+
+---
+
+# Phase 8: Create Custom Layer
+
+Create:
+
+```bash
+bitbake-layers create-layer \
+../meta-mycompany
+```
+
+Add:
+
+```bash
+bitbake-layers add-layer \
+../meta-mycompany
+```
+
+Structure:
+
+```text
+meta-mycompany
+
+├── recipes-app
+
+├── recipes-audio
+
+├── recipes-ai
+
+├── recipes-qt
+
+└── conf
+```
+
+---
+
+# Phase 9: Audio Framework
+
+Add:
+
+```text
+alsa-lib
+
+alsa-utils
+
+pipewire
+
+pipewire-alsa
+
+gstreamer
+
+gst-plugins-base
+
+gst-plugins-good
+
+gst-plugins-bad
+```
+
+In image recipe:
+
+```bitbake
+IMAGE_INSTALL += "\
+alsa-lib \
+alsa-utils \
+pipewire \
+gstreamer1.0 \
+"
+```
+
+---
+
+# Phase 10: DSP Engine
+
+Create:
+
+```text
+audio-engine/
+
+├── capture.cpp
+
+├── playback.cpp
+
+├── eq.cpp
+
+├── compressor.cpp
+
+├── reverb.cpp
+
+├── mixer.cpp
+
+└── main.cpp
+```
+
+Flow:
+
+```text
+Mic
+
+↓
+
+Capture
+
+↓
+
+EQ
+
+↓
+
+Compressor
+
+↓
+
+Reverb
+
+↓
+
+Mixer
+
+↓
+
+Playback
+
+↓
+
+Speaker
+```
+
+---
+
+Example:
+
+```cpp
+while(1)
+
+{
+
+capture(buffer);
+
+eq(buffer);
+
+compressor(buffer);
+
+reverb(buffer);
+
+playback(buffer);
+
+}
+```
+
+---
+
+# Phase 11: AI Audio
+
+Add:
+
+```text
+TensorFlow Lite
+
+eIQ
+
+NPU Drivers
+```
+
+Pipeline:
+
+```text
+Mic
+
+↓
+
+Capture
+
+↓
+
+Noise Reduction AI
+
+↓
+
+Wake Word
+
+↓
+
+DSP
+
+↓
+
+Playback
+```
+
+---
+
+# Phase 12: PipeWire Integration
+
+Modern products use:
+
+```text
+Mic
+
+↓
+
+PipeWire Capture Node
+
+↓
+
+EQ Node
+
+↓
+
+Compressor Node
+
+↓
+
+Noise Suppression Node
+
+↓
+
+Mixer Node
+
+↓
+
+Speaker
+```
+
+Applications:
+
+```text
+Qt GUI
+
+↓
+
+PipeWire API
+
+↓
+
+DSP Parameters
+```
+
+---
+
+# Phase 13: Qt GUI
+
+Create:
+
+```text
+ui/
+
+├── MainWindow
+
+├── Mixer
+
+├── EQ
+
+├── Effects
+
+├── Settings
+
+└── Presets
+```
+
+GUI:
+
+```text
+Qt
+
+↓
+
+Faders
+
+↓
+
+PipeWire
+
+↓
+
+DSP Engine
+
+↓
+
+Audio Output
+```
+
+---
+
+# Phase 14: Yocto Recipe
+
+Example:
+
+```text
+meta-mycompany/
+
+recipes-app/
+
+audio-engine/
+
+audio-engine.bb
+```
+
+```bitbake
+DESCRIPTION = "Audio DSP Engine"
+
+inherit cmake
+
+DEPENDS += "\
+
+alsa-lib
+
+pipewire
+
+tensorflow-lite
+
+qtbase
+
+"
+```
+
+---
+
+# Phase 15: Add Application to Image
+
+Edit:
+
+```bitbake
+IMAGE_INSTALL += "\
+
+audio-engine
+
+qtbase
+
+pipewire
+
+"
+```
+
+---
+
+# Phase 16: Full Build
+
+Build:
+
+```bash
+bitbake tdx-reference-multimedia-image
+```
+
+BitBake performs:
+
+```text
+Fetch Sources
+
+↓
+
+Apply Patches
+
+↓
+
+Build U-Boot
+
+↓
+
+Build ATF
+
+↓
+
+Build Linux Kernel
+
+↓
+
+Build Device Tree
+
+↓
+
+Build ALSA
+
+↓
+
+Build PipeWire
+
+↓
+
+Build GStreamer
+
+↓
+
+Build TensorFlow Lite
+
+↓
+
+Build Qt
+
+↓
+
+Build Audio Engine
+
+↓
+
+Create RootFS
+
+↓
+
+Generate WIC
+
+↓
+
+Generate TEZI
+```
+
+---
+
+# Phase 17: Flash Board
+
+Generated:
+
+```text
+tmp/deploy/images/verdin-imx8mp/
+
+Image
+
+imx8mp-verdin.dtb
+
+flash.bin
+
+rootfs.tar.gz
+
+image.wic
+
+TEZI/
+```
+
+Flash:
+
+```text
+TEZI
+
+↓
+
+USB
+
+↓
+
+Board
+
+↓
+
+Install
+
+↓
+
+eMMC
+
+↓
+
+Boot
+```
+
+---
+
+# Complete Project Architecture
+
+```text
+Hardware
+
+↓
+
+SAI / I2S
+
+↓
+
+Audio Codec
+
+↓
+
+ASoC Driver
+
+↓
+
+ALSA
+
+↓
+
+PipeWire
+
+↓
+
+DSP Engine
+
+↓
+
+TensorFlow Lite + NPU
+
+↓
+
+Qt GUI
+
+↓
+
+Yocto Recipe
+
+↓
+
+Custom Layer
+
+↓
+
+Image Recipe
+
+↓
+
+BitBake
+
+↓
+
+TEZI Image
+
+↓
+
+Flash
+
+↓
+
+Audio Product
+```
+
+For an **actual commercial audio project**, the next thing to design is usually the **software architecture** itself: *which audio pipeline to use (ALSA only, GStreamer, PipeWire, or Cortex-M7 DSP offload)* and how to organize the DSP/AI modules so latency stays below 5–10 ms. That architectural choice has a major impact on the Yocto recipes, kernel configuration, and application design.
+

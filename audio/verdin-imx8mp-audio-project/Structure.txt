@@ -1,0 +1,36 @@
+verdin-imx8mp-audio-project/
+├── README.md
+├── LICENSE
+├── .gitignore
+├── Makefile
+├── scripts/
+│   ├── build.sh
+│   ├── deploy.sh
+│   └── test_audio.sh
+├── src/
+│   ├── main.c
+│   ├── audio_engine.c
+│   ├── audio_engine.h
+│   ├── wav_loader.c
+│   ├── wav_loader.h
+│   └── utils.c
+├── include/
+│   └── audio_config.h          # Configuration constants and macros 
+    ├── wav_loader.h            # WAV file operations
+    ├── utils.h                 # Utility functions
+    └── verdin_audio.h          # Main include file (all-in-one)
+├── device-tree/
+│   ├── imx8mp-verdin-audio-overlay.dts
+│   └── README_dt.md
+├── configs/
+│   ├── asound.conf
+│   └── audio_rules.rules
+├── tests/
+│   ├── test_audio.c
+│   └── test_wav_files/
+│       ├── test_440hz.wav
+│       └── test_silence.wav
+└── docs/
+    ├── API_REFERENCE.md
+    ├── DEPLOYMENT_GUIDE.md
+    └── TROUBLESHOOTING.md

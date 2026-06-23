@@ -1,0 +1,659 @@
+If by **"build this code from scratch"** you mean **developing software for a Toradex Verdin iMX8M Plus / NXP i.MX8M Plus board**, then the software stack typically looks like this:
+
+```text
+Application Layer
+│
+├── Qt UI / GTK UI
+├── Audio Processing App
+├── AI Model
+├── Network Services
+│
+Linux User Space
+│
+├── ALSA
+├── GStreamer
+├── TensorFlow Lite
+├── Docker Containers
+│
+Linux Kernel
+│
+├── Audio Drivers
+├── Ethernet Drivers
+├── Display Drivers
+├── Camera Drivers
+│
+U-Boot Bootloader
+│
+i.MX8M Plus Hardware
+```
+
+---
+
+# 1. Set Up the Development Environment
+
+On an Ubuntu PC:
+
+```bash
+sudo apt update
+
+sudo apt install git build-essential \
+cmake gcc g++ \
+python3 python3-pip \
+g++-aarch64-linux-gnu
+```
+
+Install useful tools:
+
+```bash
+sudo apt install \
+u-boot-tools \
+device-tree-compiler \
+flex bison \
+libssl-dev \
+libncurses-dev
+```
+
+---
+
+# 2. Build U-Boot Bootloader
+
+Clone U-Boot:
+
+```bash
+git clone https://github.com/u-boot/u-boot.git
+
+cd u-boot
+```
+
+Configure for i.MX8M Plus:
+
+```bash
+make imx8mp_evk_defconfig
+```
+
+Compile:
+
+```bash
+make CROSS_COMPILE=aarch64-linux-gnu- -j8
+```
+
+Output:
+
+```text
+u-boot.bin
+spl.bin
+flash.bin
+```
+
+These are the bootloader images.
+
+---
+
+# 3. Build Linux Kernel
+
+Clone Linux:
+
+```bash
+git clone https://github.com/torvalds/linux.git
+
+cd linux
+```
+
+Configure:
+
+```bash
+make ARCH=arm64 defconfig
+```
+
+or:
+
+```bash
+make ARCH=arm64 menuconfig
+```
+
+Enable:
+
+### Audio
+
+```text
+Sound support
+
+ALSA
+
+I2S
+
+SAI
+
+S/PDIF
+```
+
+### Display
+
+```text
+DRM
+
+HDMI
+
+MIPI DSI
+
+GPU drivers
+```
+
+### Networking
+
+```text
+Ethernet
+
+PCIe
+
+WiFi
+```
+
+Compile:
+
+```bash
+make ARCH=arm64 \
+CROSS_COMPILE=aarch64-linux-gnu- \
+-j8
+```
+
+Outputs:
+
+```text
+Image
+
+dtb files
+
+kernel modules
+```
+
+---
+
+# 4. Device Tree
+
+Device Tree describes the hardware.
+
+Example:
+
+```dts
+sound {
+
+compatible = "simple-audio-card";
+
+simple-audio-card,name = "MyAudio";
+
+simple-audio-card,cpu {
+
+sound-dai = <&sai2>;
+
+};
+
+simple-audio-card,codec {
+
+sound-dai = <&codec>;
+
+};
+
+};
+```
+
+Example GPIO:
+
+```dts
+gpio-led {
+
+compatible = "gpio-leds";
+
+status {
+
+gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+
+};
+
+};
+```
+
+Compile:
+
+```bash
+dtc -I dts -O dtb myboard.dts -o myboard.dtb
+```
+
+---
+
+# 5. Root Filesystem
+
+You need:
+
+```text
+/
+
+bin
+
+etc
+
+usr
+
+lib
+
+home
+
+dev
+
+proc
+
+sys
+```
+
+Simplest:
+
+### BusyBox
+
+Clone:
+
+```bash
+git clone git://busybox.net/busybox.git
+
+cd busybox
+
+make defconfig
+
+make
+
+make install
+```
+
+This gives:
+
+```text
+sh
+
+ls
+
+cp
+
+cat
+
+mount
+
+vi
+
+etc.
+```
+
+---
+
+# 6. Build a Qt GUI
+
+Simple Qt example:
+
+```cpp
+#include <QApplication>
+
+#include <QPushButton>
+
+int main(int argc,char *argv[])
+
+{
+
+QApplication app(argc,argv);
+
+QPushButton button("Hello iMX8");
+
+button.resize(300,100);
+
+button.show();
+
+return app.exec();
+
+}
+```
+
+Compile:
+
+```bash
+qmake
+
+make
+```
+
+Result:
+
+```text
+Hello iMX8 GUI
+```
+
+Runs directly on HDMI or touchscreen.
+
+---
+
+# 7. Audio Playback Code
+
+Simple ALSA example:
+
+```cpp
+#include <alsa/asoundlib.h>
+
+int main()
+
+{
+
+snd_pcm_t *handle;
+
+snd_pcm_open(
+
+&handle,
+
+"default",
+
+SND_PCM_STREAM_PLAYBACK,
+
+0
+
+);
+
+snd_pcm_close(handle);
+
+}
+```
+
+Compile:
+
+```bash
+g++ audio.cpp \
+-lasound
+```
+
+This opens the audio device.
+
+---
+
+# 8. Record Audio
+
+Example:
+
+```cpp
+snd_pcm_open(
+
+&capture,
+
+"default",
+
+SND_PCM_STREAM_CAPTURE,
+
+0
+
+);
+```
+
+Then:
+
+```cpp
+snd_pcm_readi(
+
+capture,
+
+buffer,
+
+frames
+
+);
+```
+
+Useful for:
+
+* Microphones
+* Instruments
+* Voice assistants
+
+---
+
+# 9. DSP on Cortex-M7
+
+The M7 core can run:
+
+```text
+FFT
+
+EQ
+
+Filters
+
+Compressor
+
+Reverb
+
+Noise suppression
+```
+
+Simple FIR filter:
+
+```c
+float fir(
+
+float input)
+
+{
+
+y =
+
+b0*x[n]
+
++
+
+b1*x[n-1]
+
++
+
+b2*x[n-2];
+
+return y;
+
+}
+```
+
+Compile:
+
+```bash
+arm-none-eabi-gcc
+```
+
+This runs separately from Linux.
+
+---
+
+# 10. AI Audio Detection
+
+The NPU supports:
+
+```text
+Keyword spotting
+
+Voice detection
+
+Music classification
+
+Noise suppression
+
+Speaker recognition
+```
+
+TensorFlow Lite example:
+
+```cpp
+TfLiteModel* model
+
+=
+
+TfLiteModelCreateFromFile(
+
+"model.tflite"
+
+);
+
+TfLiteInterpreter* interpreter
+
+=
+
+TfLiteInterpreterCreate(
+
+model,
+
+options
+
+);
+
+TfLiteInterpreterInvoke(
+
+interpreter
+
+);
+```
+
+Model output:
+
+```text
+"guitar"
+
+0.97
+
+"piano"
+
+0.02
+
+"noise"
+
+0.01
+```
+
+---
+
+# 11. Simple DAW Architecture
+
+A basic DAW on i.MX8M Plus:
+
+```text
++----------------------+
+
+Qt GUI
+
+Track editor
+
+Mixer
+
+Piano roll
+
++----------------------+
+
+|
+
+v
+
++----------------------+
+
+Audio Engine
+
+ALSA
+
+Effects
+
+Mixer
+
+DSP
+
++----------------------+
+
+|
+
+v
+
++----------------------+
+
+SAI/I2S
+
+Audio Codec
+
+DAC
+
+ADC
+
++----------------------+
+```
+
+---
+
+# 12. Example Project Structure
+
+```text
+my_daw/
+
+├── bootloader/
+
+│   └── U-Boot
+
+│
+
+├── kernel/
+
+│   └── Linux
+
+│
+
+├── dts/
+
+│   └── myboard.dts
+
+│
+
+├── rootfs/
+
+│
+
+├── ui/
+
+│   └── Qt GUI
+
+│
+
+├── audio/
+
+│   └── ALSA engine
+
+│
+
+├── dsp/
+
+│   └── FIR FFT EQ
+
+│
+
+├── ai/
+
+│   └── TensorFlow Lite
+
+│
+
+└── app/
+
+└── Main program
+```
+
+---
+
+## Recommended order to learn
+
+If you are a beginner, follow this sequence:
+
+1. Learn **C and C++**.
+2. Learn **embedded Linux basics**.
+3. Build **U-Boot**.
+4. Build the **Linux kernel**.
+5. Learn **Device Tree**.
+6. Build a **BusyBox root filesystem**.
+7. Learn **ALSA audio programming**.
+8. Build a **Qt GUI**.
+9. Learn **Cortex-M7 bare-metal/FreeRTOS programming**.
+10. Add **TensorFlow Lite** and NPU acceleration.
+
+This is essentially the same software stack used in commercial products based on the Toradex Verdin iMX8M Plus, including industrial HMIs, smart speakers, digital musical instruments, and embedded DAWs.
+

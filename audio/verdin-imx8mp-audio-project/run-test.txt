@@ -1,0 +1,13 @@
+# Build the project first
+make all
+
+# Run all tests
+./scripts/test_audio.sh
+
+# Run specific test
+./scripts/test_audio.sh --device hw:0 --freq 1000 --volume 0.3
+
+# Or run individual C tests
+./bin/test_audio init
+./bin/test_audio sine
+./bin/test_audio wav
