@@ -1,7 +1,5 @@
-# 📋 Complete Project README.md
 
-```markdown
-# 🎵 Verdin iMX8MP Audio Project
+#  Verdin iMX8MP Audio Project
 
 **Professional Audio Solution for Toradex Verdin iMX8MP System-on-Module**
 
